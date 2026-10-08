@@ -1,0 +1,43 @@
+# this is created for carrying out test at the staging layer 
+version: 2
+
+models:
+  - name: dim_customer
+    columns:              
+      - name: customer_id
+        tests:
+          - not_null
+          - unique
+
+      - name: email_address
+        tests:
+          # Source data contains no email addresses (100% NULL), so not_null is not applicable.
+          # not_empty_string catches empty text fields when emails do exist.
+          - dbt_utils.not_empty_string
+          # (Optional) Checks for basic email syntax if using dbt_expectations
+          - dbt_expectations.expect_column_values_to_match_regex:
+              regex: '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'
+
+      - name: state_province
+        tests:
+          # Ensures your CRM data doesn't have messy, uncleaned states
+          - dbt_expectations.expect_column_values_to_be_in_set:
+              value_set: ['CA', 'CO', 'FL', 'HI', 'ID', 'IL', 'MA', 'MN', 'NV', 'NY', 'OR', 'TN', 'UT', 'WA', 'WI']
+              quote_values: true
+
+      - name: business_phone
+        tests:
+          # Warns you if a phone number field doesn't look like a phone number length
+          - dbt_expectations.expect_column_value_lengths_to_be_between:
+              min_value: 7
+              max_value: 15
+              config:
+                severity: warn # Good practice to make format tests warnings instead of hard failures
+
+      - name: insertion_timestamp
+        tests:
+          - not_null
+          # Ensures no corrupted data accidentally claims to be from the future
+          - dbt_utils.expression_is_true:
+              expression: "<= current_timestamp()"
+
